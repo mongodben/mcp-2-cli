@@ -1,6 +1,6 @@
 {
   "name": "mcp-2-cli",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Convert any MCP server to a CLI application",
   "main": "build/lib.js",
   "type": "module",
