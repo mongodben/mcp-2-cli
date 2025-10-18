@@ -1,0 +1,1 @@
+Hello from mcp-2-cli!
