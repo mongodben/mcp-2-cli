@@ -13,6 +13,8 @@ export class McpCliBuilder {
   private validator: ArgumentValidator;
   private cliName: string;
   private tools: import("./types.js").McpTool[] = [];
+  private prompts: import("./types.js").McpPrompt[] = [];
+  private resources: import("./types.js").McpResource[] = [];
 
   constructor(serverConfig: McpServerConfig, cliName = "mcp-cli") {
     this.mcpClient = new McpClientWrapper(serverConfig);
@@ -28,21 +30,33 @@ export class McpCliBuilder {
     // Check if ONLY help or version is requested at top level
     // We still need to connect if there are subcommands (like "tools read_text_file --help")
     const args = hideBin(process.argv);
-    const isTopLevelHelpOrVersion =
-      args.length === 0 ||
-      (args.length === 1 &&
-        (args[0] === "--help" ||
-          args[0] === "-h" ||
-          args[0] === "--version" ||
-          args[0] === "-v"));
 
-    if (!isTopLevelHelpOrVersion) {
-      // Connect to MCP server to introspect available capabilities
-      await this.mcpClient.connect();
+    // Connect to MCP server to introspect available capabilities
+    await this.mcpClient.connect();
 
-      // Load tools for validation
+    // Load all capabilities (some servers may not support all capabilities)
+    try {
+      this.prompts = await this.mcpClient.listPrompts();
+    } catch {
+      // Prompts not supported, skip
+      this.prompts = [];
+    }
+
+    try {
+      this.resources = await this.mcpClient.listResources();
+    } catch {
+      // Resources not supported, skip
+      this.resources = [];
+    }
+
+    try {
       this.tools = await this.mcpClient.listTools();
       this.tools.forEach((tool) => this.validator.registerTool(tool));
+    } catch (error) {
+      console.error("Error listing tools", error);
+
+      // Tools not supported, skip
+      this.tools = [];
     }
 
     const cli = yargs(args)
@@ -55,123 +69,132 @@ export class McpCliBuilder {
       .strict()
       .exitProcess(true);
 
-    // Add prompts commands
-    this.addPromptsCommands(cli);
+    if (this.prompts.length > 0) {
+      this.addPromptsCommands(cli, this.cliName);
+    }
 
-    // Add resources commands
-    this.addResourcesCommands(cli);
+    if (this.resources.length > 0) {
+      this.addResourcesCommands(cli, this.cliName);
+    }
 
-    // Add tools commands
-    this.addToolsCommands(cli);
+    if (this.tools.length > 0) {
+      this.addToolsCommands(cli, this.cliName);
+    }
 
     return cli;
   }
 
   /**
-   * Add prompts subcommands (list and get)
+   * Add prompts subcommands (list and individual prompt commands)
    */
-  private addPromptsCommands(cli: Argv): void {
-    cli.command("prompts", "Interact with MCP prompts", (yargs) => {
-      return yargs
-        .command("list", "List all available prompts", {}, async () => {
-          try {
-            const prompts = await this.mcpClient.listPrompts();
-            console.log(JSON.stringify(prompts, null, 2));
-            await this.cleanup();
-            process.exit(0);
-          } catch (error) {
-            this.handleError(error);
-          }
-        })
-        .command(
-          "get <name>",
-          "Get a specific prompt",
-          (yargs) => {
-            return yargs
-              .positional("name", {
-                describe: "The name of the prompt",
-                type: "string",
-                demandOption: true,
-              })
-              .option("args", {
-                describe: "JSON string of arguments for the prompt",
-                type: "string",
+  private addPromptsCommands(cli: Argv, cliName: string): void {
+    cli.command(
+      "prompts",
+      `Interact with ${cliName} prompts`,
+      (promptsYargs) => {
+        // Add an individual command for each prompt
+        this.prompts.forEach((prompt) => {
+          const promptArgs = prompt.arguments || [];
+
+          promptsYargs = promptsYargs.command(
+            prompt.name,
+            prompt.description || `Get ${prompt.name} prompt`,
+            (yargs): Argv => {
+              // Add options for each argument
+              promptArgs.forEach((arg) => {
+                yargs.option(arg.name, {
+                  describe: arg.description || arg.name,
+                  type: "string",
+                  demandOption: arg.required || false,
+                });
               });
-          },
-          async (argv) => {
-            try {
-              let promptArgs: Record<string, string> | undefined;
-              if (argv.args && typeof argv.args === "string") {
-                try {
-                  promptArgs = JSON.parse(argv.args);
-                } catch {
-                  throw new Error("Invalid JSON in --args parameter");
-                }
+              return yargs;
+            },
+            async (argv): Promise<void> => {
+              try {
+                // Build prompt args from argv
+                const args: Record<string, string> = {};
+                promptArgs.forEach((arg) => {
+                  if (argv[arg.name] !== undefined) {
+                    args[arg.name] = argv[arg.name] as string;
+                  }
+                });
+
+                const result = await this.mcpClient.getPrompt(
+                  prompt.name,
+                  args
+                );
+                console.log(JSON.stringify(result, null, 2));
+                await this.cleanup();
+                process.exit(0);
+              } catch (error) {
+                this.handleError(error);
               }
-              const result = await this.mcpClient.getPrompt(
-                argv.name as string,
-                promptArgs
-              );
-              console.log(JSON.stringify(result, null, 2));
-              await this.cleanup();
-              process.exit(0);
-            } catch (error) {
-              this.handleError(error);
             }
-          }
-        )
-        .demandCommand(1, "You must provide a prompts subcommand");
-    });
+          );
+        });
+
+        return promptsYargs.demandCommand(
+          1,
+          "You must provide a prompts subcommand"
+        );
+      }
+    );
   }
 
   /**
-   * Add resources subcommands (list and get)
+   * Add resources subcommands (list and individual resource commands)
    */
-  private addResourcesCommands(cli: Argv): void {
-    cli.command("resources", "Interact with MCP resources", (yargs) => {
-      return yargs
-        .command("list", "List all available resources", {}, async () => {
-          try {
-            const resources = await this.mcpClient.listResources();
-            console.log(JSON.stringify(resources, null, 2));
-            await this.cleanup();
-            process.exit(0);
-          } catch (error) {
-            this.handleError(error);
-          }
-        })
-        .command(
-          "get <uri>",
-          "Get a specific resource",
-          (yargs) => {
-            return yargs.positional("uri", {
-              describe: "The URI of the resource",
-              type: "string",
-              demandOption: true,
-            });
-          },
-          async (argv) => {
-            try {
-              const result = await this.mcpClient.getResource(
-                argv.uri as string
-              );
-              console.log(JSON.stringify(result, null, 2));
-              await this.cleanup();
-              process.exit(0);
-            } catch (error) {
-              this.handleError(error);
-            }
-          }
-        )
-        .demandCommand(1, "You must provide a resources subcommand");
-    });
+  private addResourcesCommands(cli: Argv, cliName: string): void {
+    cli.command(
+      "resources",
+      `Interact with ${cliName} resources`,
+      (resourcesYargs) => {
+        // Add list command
+        resourcesYargs = resourcesYargs.command(
+          "list",
+          "List all available resources",
+          {},
+          this.wrapHandler(async () => this.resources)
+        );
+
+        // Add an individual command for each resource
+        this.resources.forEach((resource) => {
+          // Create a sanitized command name from the URI
+          // Replace non-alphanumeric chars with underscores
+          const commandName = resource.uri.replace(/[^a-zA-Z0-9]/g, "_");
+
+          resourcesYargs = resourcesYargs.command(
+            commandName,
+            resource.description || `Get resource: ${resource.name}`,
+            {},
+            this.wrapHandler(async () =>
+              this.mcpClient.getResource(resource.uri)
+            )
+          );
+        });
+
+        return resourcesYargs.demandCommand(
+          1,
+          "You must provide a resources subcommand"
+        );
+      }
+    );
   }
 
   /**
    * Add tools subcommands (list and individual tool commands)
    */
-  private addToolsCommands(cli: Argv): void {
-    cli.command("tools", "Interact with MCP tools", (toolsYargs) => {
+  private addToolsCommands(cli: Argv, cliName: string): void {
+    cli.command("tools", `Interact with ${cliName} tools`, (toolsYargs) => {
+      // Add list command
+      toolsYargs = toolsYargs.command(
+        "list",
+        `List all available ${cliName} tools`,
+        {},
+        this.wrapHandler(async () => this.tools)
+      );
+
       // Add an individual command for each tool
       this.tools.forEach((tool) => {
         const schema = tool.inputSchema;
@@ -190,11 +213,7 @@ export class McpCliBuilder {
               };
               yargs.option(propName, {
                 describe: prop.description || propName,
-                type: (prop.type === "number"
-                  ? "number"
-                  : prop.type === "boolean"
-                  ? "boolean"
-                  : "string") as "string" | "number" | "boolean",
+                type: this.schemaTypeToYargsType(prop.type),
                 demandOption: requiredFields.includes(propName),
               });
             });
@@ -231,6 +250,37 @@ export class McpCliBuilder {
 
       return toolsYargs.demandCommand(1, "You must provide a tools subcommand");
     });
+  }
+
+  /**
+   * Helper: Wrap a command handler with cleanup and exit
+   */
+  private wrapHandler<T>(handler: () => Promise<T>): () => Promise<void> {
+    return async (): Promise<void> => {
+      try {
+        const result = await handler();
+        console.log(JSON.stringify(result, null, 2));
+        await this.cleanup();
+        process.exit(0);
+      } catch (error) {
+        this.handleError(error);
+      }
+    };
+  }
+
+  /**
+   * Helper: Convert JSON schema type to yargs type
+   */
+  private schemaTypeToYargsType(
+    schemaType?: string
+  ): "string" | "number" | "boolean" {
+    return (
+      schemaType === "number"
+        ? "number"
+        : schemaType === "boolean"
+        ? "boolean"
+        : "string"
+    ) as "string" | "number" | "boolean";
   }
 
   /**
