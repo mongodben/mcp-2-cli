@@ -16,10 +16,10 @@ export class McpCliBuilder {
   private prompts: import("./types.js").McpPrompt[] = [];
   private resources: import("./types.js").McpResource[] = [];
 
-  constructor(serverConfig: McpServerConfig, cliName = "mcp-cli") {
+  constructor(serverConfig: McpServerConfig) {
     this.mcpClient = new McpClientWrapper(serverConfig);
     this.validator = new ArgumentValidator();
-    this.cliName = cliName;
+    this.cliName = serverConfig.name;
   }
 
   /**
@@ -293,10 +293,9 @@ export class McpCliBuilder {
  * This is the main entry point for users of this library
  */
 export async function createMcpCli(
-  serverConfig: McpServerConfig,
-  cliName?: string
+  serverConfig: McpServerConfig
 ): Promise<Argv> {
-  const builder = new McpCliBuilder(serverConfig, cliName);
+  const builder = new McpCliBuilder(serverConfig);
   const cli = await builder.build();
 
   // Setup cleanup on exit

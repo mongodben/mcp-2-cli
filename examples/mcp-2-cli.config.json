@@ -1,0 +1,6 @@
+{
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+  "transport": "stdio",
+  "cliName": "mcp-cli"
+}

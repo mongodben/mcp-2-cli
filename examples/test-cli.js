@@ -1,4 +1,5 @@
-import { createMcpCli } from "../build/index.js";
+import { createMcpCli } from "../build/lib.js";
+import process from "process";
 
 const config = {
   command: "npx",

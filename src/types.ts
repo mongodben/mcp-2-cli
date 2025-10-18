@@ -1,15 +1,19 @@
+import { z } from "zod";
+
+export const McpServerConfigSchema = z.object({
+  command: z.string(),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  transport: z.enum(["stdio", "sse"]).default("stdio"),
+  name: z.string().default("mcp-cli"),
+});
+
 /**
  * MCP Server Configuration
  * TODO: Determine the exact shape of server config based on MCP SDK documentation
  * This might need to support stdio, SSE, or other transport types
  */
-export interface McpServerConfig {
-  command: string;
-  args?: string[];
-  env?: Record<string, string>;
-  // TODO: Add support for other transport types (SSE, HTTP, etc.)
-  transport?: 'stdio' | 'sse';
-}
+export type McpServerConfig = z.infer<typeof McpServerConfigSchema>;
 
 /**
  * Error response from MCP server following JSONRPC spec
@@ -50,7 +54,7 @@ export interface McpTool {
   name: string;
   description?: string;
   inputSchema: {
-    type: 'object';
+    type: "object";
     properties?: Record<string, unknown>;
     required?: string[];
     [key: string]: unknown;

@@ -1,0 +1,6 @@
+{
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-everything"],
+  "transport": "stdio",
+  "cliName": "everything-cli"
+}

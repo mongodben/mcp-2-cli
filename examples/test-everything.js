@@ -1,4 +1,4 @@
-import { createMcpCli } from "../build/index.js";
+import { createMcpCli } from "../build/lib.js";
 
 // Test with the "everything" MCP server which has prompts, resources, and tools
 const config = {
