@@ -64,6 +64,7 @@ export class McpCliBuilder {
       .version("0.0.1")
       .help()
       .alias("help", "h")
+      .alias("help", "list")
       .alias("version", "v")
       .demandCommand(1, "You must provide a command")
       .strict()
@@ -150,14 +151,6 @@ export class McpCliBuilder {
       "resources",
       `Interact with ${cliName} resources`,
       (resourcesYargs) => {
-        // Add list command
-        resourcesYargs = resourcesYargs.command(
-          "list",
-          "List all available resources",
-          {},
-          this.wrapHandler(async () => this.resources)
-        );
-
         // Add an individual command for each resource
         this.resources.forEach((resource) => {
           // Create a sanitized command name from the URI
@@ -187,14 +180,6 @@ export class McpCliBuilder {
    */
   private addToolsCommands(cli: Argv, cliName: string): void {
     cli.command("tools", `Interact with ${cliName} tools`, (toolsYargs) => {
-      // Add list command
-      toolsYargs = toolsYargs.command(
-        "list",
-        `List all available ${cliName} tools`,
-        {},
-        this.wrapHandler(async () => this.tools)
-      );
-
       // Add an individual command for each tool
       this.tools.forEach((tool) => {
         const schema = tool.inputSchema;
