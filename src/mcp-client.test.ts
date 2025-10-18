@@ -1,7 +1,7 @@
-import { describe, it } from 'node:test';
-import assert from 'node:assert';
-import { McpClientWrapper } from './mcp-client.js';
-import { McpServerConfig } from './types.js';
+import { describe, it } from "node:test";
+import assert from "node:assert";
+import { McpClientWrapper } from "./mcp-client.js";
+import { McpServerConfig } from "./types.js";
 
 // TODO: These tests require mocking the MCP SDK Client and Transport
 // Since we're testing integration with the actual MCP SDK, we'll need
@@ -11,26 +11,28 @@ import { McpServerConfig } from './types.js';
 // 3. Use dependency injection to pass in mock clients
 // For now, writing tests that verify the structure and basic logic
 
-describe('McpClientWrapper', () => {
+describe("McpClientWrapper", () => {
   const mockConfig: McpServerConfig = {
-    command: 'node',
-    args: ['mock-server.js'],
-    transport: 'stdio',
+    command: "node",
+    args: ["mock-server.js"],
+    transport: "stdio",
+    name: "mcp-cli",
   };
 
-  describe('constructor', () => {
-    it('should create an instance with config', () => {
+  describe("constructor", () => {
+    it("should create an instance with config", () => {
       const client = new McpClientWrapper(mockConfig);
       assert.ok(client instanceof McpClientWrapper);
     });
   });
 
-  describe('connect', () => {
-    it('should throw error for unsupported transport type', async () => {
+  describe("connect", () => {
+    it("should throw error for unsupported transport type", async () => {
       const config: McpServerConfig = {
-        command: 'node',
+        command: "node",
         args: [],
-        transport: 'sse',
+        transport: "sse",
+        name: "mcp-cli",
       };
       const client = new McpClientWrapper(config);
 
@@ -48,8 +50,8 @@ describe('McpClientWrapper', () => {
     // });
   });
 
-  describe('ensureConnected', () => {
-    it('should throw error when calling methods before connect', async () => {
+  describe("ensureConnected", () => {
+    it("should throw error when calling methods before connect", async () => {
       const client = new McpClientWrapper(mockConfig);
 
       await assert.rejects(
@@ -59,14 +61,14 @@ describe('McpClientWrapper', () => {
     });
   });
 
-  describe('error handling', () => {
+  describe("error handling", () => {
     // TODO: Test JSONRPC error formatting
     // This would require either:
     // 1. Mocking the client.callTool to throw JSONRPC errors
     // 2. Integration tests with a server that returns errors
     // 3. Exposing error formatting methods for unit testing
 
-    it('should have error formatting logic', () => {
+    it("should have error formatting logic", () => {
       // Verify the class has error handling methods
       const client = new McpClientWrapper(mockConfig);
       assert.ok(client);
