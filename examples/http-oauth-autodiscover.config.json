@@ -1,0 +1,8 @@
+{
+  "transport": "http",
+  "url": "https://example.com/mcp",
+  "oauth": {
+    "clientId": "your-client-id"
+  },
+  "name": "http-mcp-cli"
+}

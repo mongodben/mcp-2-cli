@@ -1,0 +1,15 @@
+{
+  "transport": "http",
+  "url": "https://example.com/mcp",
+  "oauth": {
+    "clientId": "your-client-id",
+    "authorizationEndpoint": "https://auth.example.com/authorize",
+    "tokenEndpoint": "https://auth.example.com/token",
+    "redirectUri": "http://localhost:3000/callback",
+    "scopes": ["mcp:read", "mcp:write"]
+  },
+  "headers": {
+    "X-Custom-Header": "value"
+  },
+  "name": "http-mcp-cli"
+}
