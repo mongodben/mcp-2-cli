@@ -1,0 +1,6 @@
+{
+    "transport": "http",
+    "url": "https://api.braintrust.dev/mcp",
+    "name": "braintrust-mcp-cli",
+    "oauth": {}
+}

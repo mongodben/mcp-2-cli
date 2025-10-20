@@ -1,5 +1,6 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   McpServerConfig,
   McpPrompt,
@@ -7,21 +8,24 @@ import {
   McpTool,
   McpToolResult,
   McpError,
-} from './types.js';
+  StdioConfig,
+  HttpConfig,
+} from "./types.js";
+import { StreamableHttpTransport } from "./http-transport.js";
 
 /**
  * Wrapper around the MCP SDK Client to provide a simplified interface
  */
 export class McpClientWrapper {
   private client: Client;
-  private transport: StdioClientTransport | null = null;
+  private transport: Transport | null = null;
   private connected = false;
 
   constructor(private config: McpServerConfig) {
     this.client = new Client(
       {
-        name: 'mcp-2-cli',
-        version: '0.0.1',
+        name: config.name || "mcp-cli",
+        version: "0.0.1",
       },
       {
         capabilities: {
@@ -41,16 +45,22 @@ export class McpClientWrapper {
       return;
     }
 
-    // TODO: Add support for other transport types beyond stdio
-    if (this.config.transport && this.config.transport !== 'stdio') {
-      throw new Error(`Transport type '${this.config.transport}' not yet supported`);
+    // Create appropriate transport based on config
+    if (this.config.transport === "stdio") {
+      const stdioConfig = this.config as StdioConfig;
+      this.transport = new StdioClientTransport({
+        command: stdioConfig.command,
+        args: stdioConfig.args || [],
+        env: stdioConfig.env,
+      });
+    } else if (this.config.transport === "http") {
+      const httpConfig = this.config as HttpConfig;
+      this.transport = new StreamableHttpTransport(httpConfig);
     }
 
-    this.transport = new StdioClientTransport({
-      command: this.config.command,
-      args: this.config.args || [],
-      env: this.config.env,
-    });
+    if (!this.transport) {
+      throw new Error(`Failed to create transport for type '${this.config.transport}'`);
+    }
 
     await this.client.connect(this.transport);
     this.connected = true;
@@ -72,7 +82,7 @@ export class McpClientWrapper {
    */
   private ensureConnected(): void {
     if (!this.connected) {
-      throw new Error('MCP client not connected. Call connect() first.');
+      throw new Error("MCP client not connected. Call connect() first.");
     }
   }
 
@@ -88,7 +98,10 @@ export class McpClientWrapper {
   /**
    * Get a specific prompt with arguments
    */
-  async getPrompt(name: string, args?: Record<string, string>): Promise<unknown> {
+  async getPrompt(
+    name: string,
+    args?: Record<string, string>
+  ): Promise<unknown> {
     this.ensureConnected();
     const response = await this.client.getPrompt({ name, arguments: args });
     return response;
@@ -124,10 +137,16 @@ export class McpClientWrapper {
   /**
    * Call a tool with arguments
    */
-  async callTool(name: string, args?: Record<string, unknown>): Promise<McpToolResult> {
+  async callTool(
+    name: string,
+    args?: Record<string, unknown>
+  ): Promise<McpToolResult> {
     this.ensureConnected();
     try {
-      const response = await this.client.callTool({ name, arguments: args || {} });
+      const response = await this.client.callTool({
+        name,
+        arguments: args || {},
+      });
       return response as McpToolResult;
     } catch (error) {
       // Handle JSONRPC errors from MCP
@@ -141,28 +160,34 @@ export class McpClientWrapper {
   /**
    * Check if error is a JSONRPC error
    */
-  private isJsonRpcError(error: unknown): error is { code: number; message: string; data?: unknown } {
+  private isJsonRpcError(
+    error: unknown
+  ): error is { code: number; message: string; data?: unknown } {
     return (
-      typeof error === 'object' &&
+      typeof error === "object" &&
       error !== null &&
-      'code' in error &&
-      'message' in error &&
-      typeof (error as { code: unknown }).code === 'number' &&
-      typeof (error as { message: unknown }).message === 'string'
+      "code" in error &&
+      "message" in error &&
+      typeof (error as { code: unknown }).code === "number" &&
+      typeof (error as { message: unknown }).message === "string"
     );
   }
 
   /**
    * Format MCP error for user-friendly output
    */
-  private formatMcpError(error: { code: number; message: string; data?: unknown }): Error {
+  private formatMcpError(error: {
+    code: number;
+    message: string;
+    data?: unknown;
+  }): Error {
     const mcpError: McpError = {
       code: error.code,
       message: error.message,
       data: error.data,
     };
     const errorMessage = `MCP Error [${mcpError.code}]: ${mcpError.message}${
-      mcpError.data ? `\nData: ${JSON.stringify(mcpError.data, null, 2)}` : ''
+      mcpError.data ? `\nData: ${JSON.stringify(mcpError.data, null, 2)}` : ""
     }`;
     return new Error(errorMessage);
   }

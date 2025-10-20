@@ -27,27 +27,27 @@ describe("McpClientWrapper", () => {
   });
 
   describe("connect", () => {
-    it("should throw error for unsupported transport type", async () => {
-      const config: McpServerConfig = {
-        command: "node",
-        args: [],
-        transport: "sse",
-        name: "mcp-cli",
-      };
-      const client = new McpClientWrapper(config);
-
-      await assert.rejects(
-        async () => await client.connect(),
-        /Transport type 'sse' not yet supported/
-      );
-    });
-
     // TODO: Add integration tests with actual MCP server
     // it('should successfully connect to MCP server', async () => {
     //   const client = new McpClientWrapper(mockConfig);
     //   await client.connect();
     //   // Verify connection state
     // });
+
+    it("should create client with stdio transport", () => {
+      const client = new McpClientWrapper(mockConfig);
+      assert.ok(client);
+    });
+
+    it("should create client with http transport", () => {
+      const config: McpServerConfig = {
+        transport: "http",
+        url: "https://example.com/mcp",
+        name: "mcp-cli",
+      };
+      const client = new McpClientWrapper(config);
+      assert.ok(client);
+    });
   });
 
   describe("ensureConnected", () => {
